@@ -1,0 +1,36 @@
+{
+  "text": "Quand il y a des hommes brisés et il y a un seul moyen de les refaire hommes, c'est qu'ils deviennent sauveurs des autres. Pris individuellement, ils ne le pourraient pas. Pris ensemble, ils se redécouvrent tout d'un coup une force et ils savent qu'ils peuvent apporter, devenir bienfaiteurs. Et je leur dis souvent, ça prouve qu'on est vraiment sauvé quand on est devenu sauveur.",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 9.8,
+      "text": "Quand il y a des hommes brisés et il y a un seul moyen de les refaire hommes, c'est qu'ils deviennent sauveurs des autres."
+    },
+    {
+      "start": 10.32,
+      "end": 11.88,
+      "text": "Pris individuellement, ils ne le pourraient pas."
+    },
+    {
+      "start": 12.32,
+      "end": 18.68,
+      "text": "Pris ensemble, ils se redécouvrent tout d'un coup une force et ils savent qu'ils peuvent apporter, devenir bienfaiteurs."
+    },
+    {
+      "start": 19.08,
+      "end": 22.46,
+      "text": "Et je leur dis souvent, ça prouve qu'on est vraiment sauvé quand on est devenu sauveur."
+    }
+  ],
+  "info": {
+    "language": "fr",
+    "duration": 22.585,
+    "processing_time": 51.40977215766907,
+    "speed_ratio": 0.43931336499087903
+  },
+  "metadata": {
+    "filename": "7729.mp3",
+    "model": "large-v3",
+    "device": "cpu"
+  }
+}

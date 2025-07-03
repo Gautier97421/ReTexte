@@ -38,6 +38,9 @@ export default function TranscriptionApp() {
     setError(null)
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000) // 10 minutes
+
       const formData = new FormData()
       formData.append("file", audioFile)
       formData.append("language", language)
@@ -45,21 +48,29 @@ export default function TranscriptionApp() {
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       })
 
-      const data = await response.json()
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error(data.error || "Erreur de transcription")
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || "Erreur de transcription")
       }
 
+      const data = await response.json()
       setResult(data)
     } catch (err: any) {
-      setError(err.message)
+      if (err.name === "AbortError") {
+        setError("Le délai d'attente de la transcription a été dépassé.")
+      } else {
+        setError(err.message)
+      }
     } finally {
       setIsProcessing(false)
     }
   }
+
 
   const generatePDF = async () => {
     if (!result) return
@@ -125,7 +136,7 @@ export default function TranscriptionApp() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">TranscriptionAI</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">ReTexte</h1>
           <p className="text-lg text-gray-600">Transformez vos fichiers audio en PDF transcrit</p>
         </div>
 

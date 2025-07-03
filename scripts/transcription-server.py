@@ -7,6 +7,7 @@ import json
 import time
 from pathlib import Path
 from typing import Dict, Any
+from pydub import AudioSegment
 
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -23,7 +24,7 @@ CACHE_DIR = Path("./cache")
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 
 # Créer l'application
-app = FastAPI(title="TranscriptionAI", version="1.0.0")
+app = FastAPI(title="ReTexte", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,6 +36,18 @@ app.add_middleware(
 # Variables globales
 whisper_model = None
 stats = {"total_transcriptions": 0, "cache_hits": 0}
+
+
+MAX_SEGMENT_DURATION_MS = 15 * 60 * 1000
+
+def split_audio(file_path):
+    audio = AudioSegment.from_file(file_path)
+    segments = []
+    for start_ms in range(0, len(audio), MAX_SEGMENT_DURATION_MS):
+        end_ms = min(start_ms + MAX_SEGMENT_DURATION_MS, len(audio))
+        segment = audio[start_ms:end_ms]
+        segments.append(segment)
+    return segments
 
 def load_model():
     """Charge le modèle Whisper une seule fois"""
@@ -66,9 +79,10 @@ def load_cache(file_hash: str) -> Dict[str, Any] | None:
             pass
     return None
 
+
 @app.get("/")
 async def root():
-    return {"message": "TranscriptionAI - Serveur de transcription", "status": "ok"}
+    return {"message": "ReTExte - Serveur de transcription", "status": "ok"}
 
 @app.get("/health")
 async def health():
@@ -81,68 +95,68 @@ async def health():
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), language: str = "fr"):
-    """Transcrit un fichier audio en texte"""
-    
-    # Vérifications
     if not file.filename:
         raise HTTPException(status_code=400, detail="Nom de fichier manquant")
-    
-    # Lire le fichier
+
     file_content = await file.read()
     if len(file_content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 500MB)")
-    
-    # Vérifier le cache
+
     file_hash = hashlib.sha256(file_content).hexdigest()
     cached_result = load_cache(file_hash)
     if cached_result:
-        print(f"📋 Cache hit pour {file.filename}")
         return JSONResponse(content=cached_result)
-    
-    # Charger le modèle
+
     load_model()
-    
-    # Sauvegarder temporairement
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
         tmp_file.write(file_content)
         tmp_file_path = tmp_file.name
-    
+
     try:
-        print(f"🎵 Transcription de {file.filename}...")
-        start_time = time.time()
-        
-        # Transcription
-        segments, info = whisper_model.transcribe(
-            tmp_file_path,
-            language=language if language != "auto" else None,
-            beam_size=5,
-            temperature=0.0,
-            vad_filter=True
-        )
-        
-        # Construire le résultat
-        segments_list = []
+        audio = AudioSegment.from_file(tmp_file_path)
+        total_duration_ms = len(audio)
+        all_segments = []
         full_text = ""
-        
-        for segment in segments:
-            segment_data = {
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text.strip()
-            }
-            segments_list.append(segment_data)
-            full_text += segment.text.strip() + " "
-        
+        start_time = time.time()
+
+        for start_ms in range(0, total_duration_ms, MAX_SEGMENT_DURATION_MS):
+            end_ms = min(start_ms + MAX_SEGMENT_DURATION_MS, total_duration_ms)
+            segment_audio = audio[start_ms:end_ms]
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_seg_file:
+                segment_audio.export(tmp_seg_file.name, format="wav")
+                tmp_seg_path = tmp_seg_file.name
+
+            segments, info = whisper_model.transcribe(
+                tmp_seg_path,
+                language=language if language != "auto" else None,
+                beam_size=5,
+                temperature=0.0,
+                vad_filter=True
+            )
+
+            for segment in segments:
+                segment_data = {
+                    "start": segment.start + start_ms / 1000,
+                    "end": segment.end + start_ms / 1000,
+                    "text": segment.text.strip()
+                }
+                all_segments.append(segment_data)
+                full_text += segment.text.strip() + " "
+
+            os.unlink(tmp_seg_path)
+
         processing_time = time.time() - start_time
-        
+
         result = {
             "text": full_text.strip(),
-            "segments": segments_list,
+            "segments": all_segments,
             "info": {
                 "language": info.language,
-                "duration": info.duration,
+                "duration": total_duration_ms / 1000,
                 "processing_time": processing_time,
-                "speed_ratio": info.duration / processing_time if processing_time > 0 else 0
+                "speed_ratio": (total_duration_ms / 1000) / processing_time if processing_time > 0 else 0
             },
             "metadata": {
                 "filename": file.filename,
@@ -150,23 +164,22 @@ async def transcribe(file: UploadFile = File(...), language: str = "fr"):
                 "device": DEVICE
             }
         }
-        
-        # Sauvegarder dans le cache
+
         save_cache(file_hash, result)
         stats["total_transcriptions"] += 1
-        
-        print(f"✅ Transcription terminée en {processing_time:.2f}s")
+
         return JSONResponse(content=result)
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-    
+
     finally:
-        # Nettoyer
         try:
             os.unlink(tmp_file_path)
         except:
             pass
+
+
 
 if __name__ == "__main__":
     print("🚀 Démarrage du serveur de transcription...")
