@@ -53,7 +53,7 @@ COPY requirements.txt package.json ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Installer les dépendances Node.js
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Pré-télécharger le modèle Whisper
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu', compute_type='int8')"
