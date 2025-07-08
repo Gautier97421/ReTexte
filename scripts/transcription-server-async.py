@@ -272,7 +272,7 @@ async def process_transcription_async(job_id: str, file_content: bytes, filename
 @app.get("/")
 async def root():
     return {
-        "message": "TranscriptionAI Pro - Réseau Local Multi-Utilisateurs", 
+        "message": "ReTexte - Réseau Local Multi-Utilisateurs", 
         "status": "ok",
         "version": "2.2.0",
         "model": MODEL_SIZE,
@@ -418,9 +418,9 @@ async def get_queue_status():
     }
 
 if __name__ == "__main__":
-    print("🚀 Démarrage TranscriptionAI Pro - Réseau Local...")
+    port = int(os.getenv("PORT", 10001))
+    print("🚀 Démarrage ReTexte - Réseau Local...")
     print("   👥 Support multi-utilisateurs avec file d'attente")
     print("   🎵 Une transcription à la fois (évite les conflits)")
     print()
-    uvicorn.run(app, host="0.0.0.0", port=10001, log_level="info")
-
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

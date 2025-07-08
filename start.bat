@@ -17,12 +17,12 @@
 @REM npm run dev
 
 @echo off
-title TranscriptionAI Pro - Démarrage
+title ReTexte - Démarrage
 color 0A
 
 echo.
 echo ╔══════════════════════════════════════════════════════════════╗
-echo ║                    TranscriptionAI Pro                       ║
+echo ║                         ReTexte                              ║
 echo ║                   Démarrage Instantané                       ║
 echo ╚══════════════════════════════════════════════════════════════╝
 echo.
@@ -36,14 +36,14 @@ if not exist "logs\" mkdir logs
 if not exist "jobs\" mkdir jobs
 
 echo 🚀 Démarrage du serveur (instantané)...
-start /min "TranscriptionAI Server" python scripts\transcription-server-async.py
+start /min "ReTexte Server" python scripts\transcription-server-async.py
 
 echo ⏳ Initialisation (2 secondes)...
 timeout /t 2 /nobreak >nul
 
 echo 🌐 Démarrage de l'interface web...
 echo.
-echo 🎉 TranscriptionAI prêt!
+echo 🎉 ReTexte prêt!
 echo 📱 Interface web: http://localhost:3000
 echo 🔌 API serveur: http://localhost:8000
 echo.
