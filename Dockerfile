@@ -21,7 +21,7 @@
 
 # # Étape 6 : Exposer le port que ton API utilise (8000 par défaut avec uvicorn)
 # EXPOSE 8000
-
+# RUN npm run build
 # # Étape 7 : Commande de démarrage (tu peux l’ajuster si besoin)
 # CMD ["python", "scripts/transcription-server-async.py"]
 
@@ -53,7 +53,7 @@ COPY requirements.txt package.json ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Installer les dépendances Node.js
-RUN npm install --only=production
+RUN npm install --omit=dev
 
 # Pré-télécharger le modèle Whisper
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu', compute_type='int8')"
