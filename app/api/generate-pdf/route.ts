@@ -5,33 +5,45 @@ export async function POST(request: NextRequest) {
   try {
     const { text, filename } = await request.json()
 
-    // Créer un nouveau document PDF
     const doc = new jsPDF()
 
-    // Configuration de la police et du style
+    // Configuration
+    const lineHeight = 7
+    const marginLeft = 20
+    const marginRight = 20
+    const pageHeight = doc.internal.pageSize.height
+    let currentY = 50
+
     doc.setFont("helvetica", "normal")
     doc.setFontSize(12)
 
-    // Titre du document
+    // Titre
     doc.setFontSize(16)
     doc.setFont("helvetica", "bold")
-    doc.text("Transcription Audio", 20, 20)
+    doc.text("Transcription Audio", marginLeft, 20)
 
-    // Nom du fichier source
+    // Fichier et date
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
-    doc.text(`Fichier source: ${filename}`, 20, 30)
-    doc.text(`Date: ${new Date().toLocaleDateString("fr-FR")}`, 20, 35)
+    doc.text(`Fichier source: ${filename}`, marginLeft, 30)
+    doc.text(`Date: ${new Date().toLocaleDateString("fr-FR")}`, marginLeft, 35)
 
     // Ligne de séparation
-    doc.line(20, 40, 190, 40)
+    doc.line(marginLeft, 40, 190, 40)
 
     // Contenu de la transcription
     doc.setFontSize(11)
     const splitText = doc.splitTextToSize(text, 170)
-    doc.text(splitText, 20, 50)
 
-    // Générer le PDF en tant que buffer
+    for (const line of splitText) {
+      if (currentY > pageHeight - 20) {
+        doc.addPage()
+        currentY = 20
+      }
+      doc.text(line, marginLeft, currentY)
+      currentY += lineHeight
+    }
+
     const pdfBuffer = doc.output("arraybuffer")
 
     return new NextResponse(pdfBuffer, {

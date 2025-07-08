@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Upload, FileAudio, Download, Loader2 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Upload, FileAudio, Download, Loader2, Clock, Timer, Zap } from "lucide-react"
 import { useDropzone } from "react-dropzone"
 
 interface TranscriptionResult {
@@ -18,12 +19,24 @@ interface TranscriptionResult {
     duration: number
     processing_time: number
     speed_ratio: number
+    processing_speed_mb_per_min?: number
   }
   metadata: {
     filename: string
     model: string
     device: string
+    processing_mode: string
+    file_size_mb?: number
   }
+}
+
+interface AsyncJob {
+  job_id: string
+  status: string
+  progress?: number
+  estimated_time_minutes?: number
+  estimated_time_seconds?: number
+  mode?: string
 }
 
 export default function TranscriptionApp() {
@@ -32,45 +45,138 @@ export default function TranscriptionApp() {
   const [result, setResult] = useState<TranscriptionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [language, setLanguage] = useState("fr")
+  const [asyncJob, setAsyncJob] = useState<AsyncJob | null>(null)
+  const [progress, setProgress] = useState(0)
+
+  // États pour l'animation et le temps
+  const [startTime, setStartTime] = useState<number | null>(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const [estimatedTotalTime, setEstimatedTotalTime] = useState(0)
+  const [remainingTime, setRemainingTime] = useState(0)
+
+  // Timer pour mettre à jour le temps écoulé
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+
+    if (isProcessing && startTime) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000)
+        setElapsedTime(elapsed)
+
+        // Calculer le temps restant basé sur le progrès
+        if (progress > 5) {
+          const estimatedTotal = (elapsed / progress) * 100
+          const remaining = Math.max(0, estimatedTotal - elapsed)
+          setRemainingTime(Math.floor(remaining))
+        } else if (estimatedTotalTime > 0) {
+          // Utiliser l'estimation initiale si pas encore de progrès
+          setRemainingTime(Math.max(0, estimatedTotalTime - elapsed))
+        }
+      }, 1000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isProcessing, startTime, progress, estimatedTotalTime])
+
+  // Polling pour les jobs asynchrones
+  useEffect(() => {
+    if (asyncJob && (asyncJob.status === "queued" || asyncJob.status === "processing")) {
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/transcribe/status/${asyncJob.job_id}`)
+          const status = await response.json()
+
+          setProgress(status.progress || 0)
+          setAsyncJob((prev) => ({ ...prev!, ...status }))
+
+          if (status.status === "completed") {
+            // Récupérer le résultat
+            const resultResponse = await fetch(`http://localhost:8000/transcribe/result/${asyncJob.job_id}`)
+            const resultData = await resultResponse.json()
+            setResult(resultData)
+            setIsProcessing(false)
+            setProgress(100)
+            clearInterval(interval)
+          } else if (status.status === "error") {
+            setError(status.error || "Erreur de transcription")
+            setIsProcessing(false)
+            clearInterval(interval)
+          }
+        } catch (err) {
+          console.error("Erreur polling:", err)
+        }
+      }, 2000)
+
+      return () => clearInterval(interval)
+    }
+  }, [asyncJob])
+
+  const calculateEstimatedTime = (fileSizeMB: number, isLarge: boolean) => {
+    // Estimations plus réalistes pour modèle MEDIUM sur CPU
+    if (isLarge) {
+      // Gros fichiers: ~8MB par minute de traitement
+      return Math.ceil(fileSizeMB / 8) * 60
+    } else {
+      // Petits fichiers: ~12MB par minute de traitement
+      return Math.ceil(fileSizeMB / 12) * 60
+    }
+  }
 
   const processAudio = async (audioFile: File) => {
     setIsProcessing(true)
     setError(null)
+    setResult(null)
+    setProgress(0)
+    setStartTime(Date.now())
+    setElapsedTime(0)
+
+    const fileSizeMB = audioFile.size / (1024 * 1024)
+    const isLargeFile = fileSizeMB > 50 // Seuil réduit à 50MB
+
+    // Calculer le temps estimé
+    const estimated = calculateEstimatedTime(fileSizeMB, isLargeFile)
+    setEstimatedTotalTime(estimated)
+    setRemainingTime(estimated)
 
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000) // 10 minutes
-
       const formData = new FormData()
       formData.append("file", audioFile)
       formData.append("language", language)
 
-      const response = await fetch("/api/transcribe", {
+      console.log(`${isLargeFile ? "🐘 Gros fichier" : "🐁 Petit fichier"}: ${fileSizeMB.toFixed(1)}MB`)
+
+      const response = await fetch("http://localhost:8000/transcribe", {
         method: "POST",
         body: formData,
-        signal: controller.signal,
       })
 
-      clearTimeout(timeoutId)
+      const data = await response.json()
 
       if (!response.ok) {
-        const data = await response.json().catch(() => null)
-        throw new Error(data?.error || "Erreur de transcription")
+        throw new Error(data.detail || data.error || "Erreur de transcription")
       }
 
-      const data = await response.json()
-      setResult(data)
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        setError("Le délai d'attente de la transcription a été dépassé.")
+      if (data.job_id) {
+        // Mode asynchrone
+        setAsyncJob(data)
+        if (data.estimated_time_seconds) {
+          setEstimatedTotalTime(data.estimated_time_seconds)
+          setRemainingTime(data.estimated_time_seconds)
+        }
+        console.log(`⏱️ Temps estimé: ${data.estimated_time_minutes} minutes`)
       } else {
-        setError(err.message)
+        // Mode synchrone
+        setResult(data)
+        setIsProcessing(false)
+        setProgress(100)
       }
-    } finally {
+    } catch (err: any) {
+      setError(err.message)
       setIsProcessing(false)
     }
   }
-
 
   const generatePDF = async () => {
     if (!result) return
@@ -106,6 +212,11 @@ export default function TranscriptionApp() {
       setFile(audioFile)
       setResult(null)
       setError(null)
+      setAsyncJob(null)
+      setProgress(0)
+      setStartTime(null)
+      setElapsedTime(0)
+      setRemainingTime(0)
     }
   }, [])
 
@@ -122,45 +233,84 @@ export default function TranscriptionApp() {
     setFile(null)
     setResult(null)
     setError(null)
+    setAsyncJob(null)
     setIsProcessing(false)
+    setProgress(0)
+    setStartTime(null)
+    setElapsedTime(0)
+    setRemainingTime(0)
   }
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
+    const hours = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
     const secs = Math.floor(seconds % 60)
+
+    if (hours > 0) {
+      return `${hours}h${mins.toString().padStart(2, "0")}m${secs.toString().padStart(2, "0")}s`
+    }
     return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const formatTimeSimple = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const getFileSizeInfo = (file: File) => {
+    const sizeMB = file.size / (1024 * 1024)
+    const isLarge = sizeMB > 50 // Seuil réduit
+    const estimatedMinutes = Math.ceil(sizeMB / (isLarge ? 8 : 12)) // Estimations plus réalistes
+
+    return {
+      sizeMB,
+      isLarge,
+      estimatedMinutes,
+      mode: isLarge ? "Asynchrone (>50MB)" : "Synchrone (<50MB)",
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">ReTexte</h1>
-          <p className="text-lg text-gray-600">Transformez vos fichiers audio en PDF transcrit</p>
+          <p className="text-lg text-gray-600">Modèle Medium - Plus rapide et estimations réalistes</p>
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <Zap className="w-5 h-5 text-yellow-500" />
+            <span className="text-sm text-gray-500">Seuil async réduit à 50MB pour de meilleures performances</span>
+          </div>
         </div>
 
-        {/* Upload Zone */}
+        {/* Upload Zone avec animation */}
         {!file && !result && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Upload className="w-5 h-5" />
-                Importer un fichier audio
+                Importer un fichier audio/vidéo
               </CardTitle>
-              <CardDescription>Formats supportés: MP3, WAV, M4A, OGG, FLAC, MP4</CardDescription>
+              <CardDescription>
+                Formats supportés: MP3, WAV, M4A, OGG, FLAC, MP4
+                <br />
+                <strong>Optimisé pour CPU • Modèle Medium • Estimations réalistes</strong>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div
                 {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-24 text-center cursor-pointer transition-colors ${
-                  isDragActive ? "border-blue-400 bg-blue-50" : "border-gray-300 hover:border-gray-400"
+                className={`relative border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all duration-300 ${
+                  isDragActive
+                    ? "border-blue-400 bg-blue-50 scale-105"
+                    : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
                 }`}
               >
                 <input {...getInputProps()} />
                 <FileAudio className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                 {isDragActive ? (
-                  <p className="text-blue-600 text-lg">Déposez le fichier ici...</p>
+                  <p className="text-blue-600 text-lg font-medium">Déposez le fichier ici...</p>
                 ) : (
                   <div>
                     <p className="text-gray-600 text-lg mb-2">Glissez-déposez votre fichier ici</p>
@@ -184,7 +334,15 @@ export default function TranscriptionApp() {
                   <FileAudio className="w-8 h-8 text-blue-600" />
                   <div>
                     <p className="font-medium">{file.name}</p>
-                    <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <div className="text-sm text-gray-500">
+                      <p>{getFileSizeInfo(file).sizeMB.toFixed(1)} MB</p>
+                      <p
+                        className={`font-medium ${getFileSizeInfo(file).isLarge ? "text-orange-600" : "text-green-600"}`}
+                      >
+                        {getFileSizeInfo(file).mode}
+                      </p>
+                      <p>⏱️ Estimation réaliste: ~{getFileSizeInfo(file).estimatedMinutes} minutes</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -215,53 +373,117 @@ export default function TranscriptionApp() {
           </Card>
         )}
 
-        {/* Processing */}
+        {/* Processing avec animation */}
         {isProcessing && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Transcription en cours...
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              </div>
-            </CardContent>
+          <Card className="mb-6 relative overflow-hidden">
+            {/* Animation de bordure bleue */}
+            <div className="absolute inset-0 rounded-lg">
+              <div className="absolute inset-0 rounded-lg border-4 border-transparent bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 animate-spin-slow opacity-20"></div>
+              <div className="absolute inset-1 rounded-lg bg-white"></div>
+            </div>
+
+            <div className="relative z-10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  {asyncJob ? `Transcription ${asyncJob.status}...` : "Transcription en cours..."}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Informations de temps */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                    <Timer className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Temps écoulé</p>
+                      <p className="font-mono text-lg font-bold text-blue-600">{formatTimeSimple(elapsedTime)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg">
+                    <Clock className="w-5 h-5 text-orange-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Temps restant</p>
+                      <p className="font-mono text-lg font-bold text-orange-600">
+                        {remainingTime > 0 ? formatTimeSimple(remainingTime) : "--:--"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+                    <Loader2 className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Progression</p>
+                      <p className="font-mono text-lg font-bold text-green-600">{progress}%</p>
+                    </div>
+                  </div>
+                </div>
+
+                {asyncJob ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Job ID: {asyncJob.job_id.slice(0, 8)}...</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="w-full h-3" />
+                    {asyncJob.estimated_time_minutes && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Clock className="w-4 h-4" />
+                        <span>Estimation: ~{asyncJob.estimated_time_minutes} minutes (modèle Medium)</span>
+                      </div>
+                    )}
+                    <p className="text-sm text-gray-500">💡 Vous pouvez fermer cette page et revenir plus tard</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Progress value={progress} className="w-full h-3" />
+                    <div className="flex items-center justify-center py-4">
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                        <span className="text-gray-600">Traitement optimisé en cours...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </div>
           </Card>
         )}
 
         {/* Results */}
         {result && (
           <div className="space-y-6">
-            <Card>
+            <Card className="border-green-200 bg-green-50">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Transcription terminée
+                <CardTitle className="flex items-center justify-between text-green-800">
+                  ✅ Transcription terminée
                   <Button onClick={generatePDF} className="flex items-center gap-2">
                     <Download className="w-4 h-4" />
                     Télécharger PDF
                   </Button>
                 </CardTitle>
                 <CardDescription>
-                  <div className="flex gap-4 text-sm">
-                    <span>Fichier: {result.metadata.filename}</span>
-                    <span>Langue: {result.info.language}</span>
-                    <span>Durée: {formatTime(result.info.duration)}</span>
-                    <span>Vitesse: {result.info.speed_ratio.toFixed(1)}x</span>
+                  <div className="flex gap-4 text-sm text-green-700 flex-wrap">
+                    <span>📁 {result.metadata.filename}</span>
+                    <span>🌍 {result.info.language}</span>
+                    <span>⏱️ {formatTime(result.info.duration)}</span>
+                    <span>⚡ {result.info.speed_ratio.toFixed(1)}x</span>
+                    <span>🔧 {result.metadata.model}</span>
+                    {result.info.processing_speed_mb_per_min && (
+                      <span>🚀 {result.info.processing_speed_mb_per_min.toFixed(1)}MB/min</span>
+                    )}
                   </div>
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <div className="bg-white rounded-lg p-4 max-h-96 overflow-y-auto border">
                   <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">{result.text}</pre>
                 </div>
               </CardContent>
             </Card>
 
             <div className="text-center">
-              <Button variant="outline" onClick={resetApp}>
+              <Button variant="outline" onClick={resetApp} className="px-8 bg-transparent">
                 Transcrire un autre fichier
               </Button>
             </div>
@@ -272,11 +494,39 @@ export default function TranscriptionApp() {
         {error && (
           <Card className="border-red-200 bg-red-50">
             <CardContent className="pt-6">
-              <p className="text-red-600 text-center">{error}</p>
+              <p className="text-red-600 text-center font-medium">{error}</p>
+              {error.includes("Timeout") && (
+                <div className="mt-4 text-sm text-gray-600">
+                  <p>
+                    <strong>Solutions:</strong>
+                  </p>
+                  <ul className="list-disc list-inside mt-2">
+                    <li>Le modèle Medium est plus rapide que Large-v3</li>
+                    <li>Découpez votre fichier en segments plus courts</li>
+                    <li>Utilisez un format compressé (MP3 au lieu de WAV)</li>
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
       </div>
+
+      {/* Styles CSS pour l'animation */}
+      <style jsx>{`
+        @keyframes spin-slow {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        
+        .animate-spin-slow {
+          animation: spin-slow 3s linear infinite;
+        }
+      `}</style>
     </div>
   )
 }

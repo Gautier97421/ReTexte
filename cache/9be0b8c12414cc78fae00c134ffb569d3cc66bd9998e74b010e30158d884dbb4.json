@@ -1,0 +1,32 @@
+{
+  "text": "I have a dream that one day this nation will rise up and live out the true meaning of its creed. We hold these truths to be self-evident that all men are created equal.",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 12.54,
+      "text": "I have a dream that one day this nation will rise up and live out the true meaning of its creed."
+    },
+    {
+      "start": 12.54,
+      "end": 18.58,
+      "text": "We hold these truths to be self-evident that all men are created equal."
+    }
+  ],
+  "info": {
+    "language": "fr",
+    "duration": 18.649,
+    "processing_time": 12.22557544708252,
+    "speed_ratio": 1.5254087695684175,
+    "total_segments": 2,
+    "processing_speed_mb_per_min": 3.5069833366421093
+  },
+  "metadata": {
+    "filename": "7734.mp3",
+    "model": "medium",
+    "device": "cpu",
+    "processing_mode": "sync",
+    "file_size_mb": 0.7145814895629883,
+    "user_id": "537e2860",
+    "queue_position": 1
+  }
+}
