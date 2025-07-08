@@ -47,13 +47,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 WORKDIR /app
 
 # Copier les fichiers de dépendances
-COPY requirements.txt package.json ./
+COPY requirements.txt package.json package-lock.json ./
 
 # Installer les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Installer les dépendances Node.js
-RUN npm install --omit=dev
+RUN npm install --only=production
 
 # Pré-télécharger le modèle Whisper
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu', compute_type='int8')"
