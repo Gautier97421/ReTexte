@@ -20,7 +20,7 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Étape 6 : Exposer le port que ton API utilise (8000 par défaut avec uvicorn)
-EXPOSE 10001
+EXPOSE 8000
 
 # Étape 7 : Commande de démarrage (tu peux l’ajuster si besoin)
 CMD ["python", "scripts/transcription-server-async.py"]

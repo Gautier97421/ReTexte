@@ -149,6 +149,27 @@ def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: 
         file_size = os.path.getsize(file_path)
         print(f"📁 Utilisateur {user_id}: Fichier {file_size} bytes")
 
+        estimated_duration = max(30, file_size_mb * 5)  # 5 secondes par MB estimé
+        
+        # Thread pour mettre à jour la progression
+        progress_stop_event = threading.Event()
+        
+        def update_progress():
+            start_time = time.time()
+            while not progress_stop_event.is_set():
+                elapsed = time.time() - start_time
+                progress = min(95, int((elapsed / estimated_duration) * 100))
+                
+                if job_id and job_id in jobs_status:
+                    jobs_status[job_id]["progress"] = max(20, progress)
+                
+                time.sleep(2)  # Mise à jour toutes les 2 secondes
+        
+        # Démarrer le thread de progression si on a un job_id
+        if job_id:
+            progress_thread = threading.Thread(target=update_progress)
+            progress_thread.daemon = True
+            progress_thread.start()
         # Transcription
         start_time = time.time()
 
@@ -216,6 +237,8 @@ def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: 
         return result
 
     except Exception as e:
+        if job_id:
+            progress_stop_event.set()
         print(f"❌ Utilisateur {user_id}: Erreur transcription: {str(e)}")
         raise e
 
@@ -249,10 +272,10 @@ async def process_transcription_async(job_id: str, file_content: bytes, filename
 
         try:
             jobs_status[job_id]["progress"] = 20
-            result = transcribe_file_safe(tmp_file_path, language, filename, user_id)
+            result = transcribe_file_safe(tmp_file_path, language, filename, user_id, job_id)
             result["metadata"]["processing_mode"] = "async"
             
-            jobs_status[job_id]["progress"] = 90
+            jobs_status[job_id]["progress"] = 95
             save_cache(file_hash, result)
             stats["total_transcriptions"] += 1
             stats["async_jobs"] += 1
@@ -418,7 +441,7 @@ async def get_queue_status():
     }
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10001))
+    port = int(os.getenv("PORT", 8000))
     print("🚀 Démarrage ReTexte - Réseau Local...")
     print("   👥 Support multi-utilisateurs avec file d'attente")
     print("   🎵 Une transcription à la fois (évite les conflits)")
