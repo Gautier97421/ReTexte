@@ -47,7 +47,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 WORKDIR /app
 
 # Copier les fichiers de dépendances
-COPY requirements.txt package.json package-lock.json ./
+COPY requirements.txt package.json ./
 
 # Installer les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
