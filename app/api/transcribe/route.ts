@@ -13,8 +13,6 @@ export async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: "Aucun fichier fourni" }, { status: 400 })
     }
-
-    // Vérifier la taille du fichier
     const fileSizeMB = file.size / (1024 * 1024)
     console.log(`📁 Fichier: ${file.name} (${fileSizeMB.toFixed(1)}MB)`)
 

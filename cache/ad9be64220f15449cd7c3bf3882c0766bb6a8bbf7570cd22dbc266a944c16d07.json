@@ -1,0 +1,87 @@
+{
+  "text": "Nos amis, au secours. Une femme vient de mourir gelée. Il fait froid et nous nous avons chauds. Mais pendant ce temps, toutes les nuits, il y a des hommes et des femmes, des petits enfants, qui en plein Paris, sont étendus dans la neige sur le trottoir. Pour les chiens qui crèvent dehors, il y a une fourrière. Est-ce que pour nos frères et nos sœurs, il n'y aura rien ? Les adhiles sont pleins, nous a-t-on dit. Un brave homme d'agent à qui on disait. Mais vous ne pouvez pas aller conduire quelque part nous répondre S'ils ne sont pas morts, nous n'avons pas de consigne. S'ils étaient morts, on appellerait la morque. Mais pour les vivants, il n'y a pas de place.",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 2.0,
+      "text": "Nos amis, au secours."
+    },
+    {
+      "start": 3.0,
+      "end": 6.0,
+      "text": "Une femme vient de mourir gelée."
+    },
+    {
+      "start": 6.0,
+      "end": 11.45,
+      "text": "Il fait froid et nous nous avons chauds."
+    },
+    {
+      "start": 11.45,
+      "end": 16.28,
+      "text": "Mais pendant ce temps, toutes les nuits, il y a des hommes et des femmes, des petits enfants,"
+    },
+    {
+      "start": 16.28,
+      "end": 20.74,
+      "text": "qui en plein Paris, sont étendus dans la neige sur le trottoir."
+    },
+    {
+      "start": 20.74,
+      "end": 24.27,
+      "text": "Pour les chiens qui crèvent dehors, il y a une fourrière."
+    },
+    {
+      "start": 24.27,
+      "end": 26.27,
+      "text": "Est-ce que pour nos frères et nos sœurs, il n'y aura rien ?"
+    },
+    {
+      "start": 26.27,
+      "end": 28.64,
+      "text": "Les adhiles sont pleins, nous a-t-on dit."
+    },
+    {
+      "start": 28.64,
+      "end": 31.2,
+      "text": "Un brave homme d'agent à qui on disait."
+    },
+    {
+      "start": 31.2,
+      "end": 34.2,
+      "text": "Mais vous ne pouvez pas aller conduire quelque part nous répondre"
+    },
+    {
+      "start": 34.2,
+      "end": 36.84,
+      "text": "S'ils ne sont pas morts, nous n'avons pas de consigne."
+    },
+    {
+      "start": 36.84,
+      "end": 39.24,
+      "text": "S'ils étaient morts, on appellerait la morque."
+    },
+    {
+      "start": 39.24,
+      "end": 42.64,
+      "text": "Mais pour les vivants, il n'y a pas de place."
+    }
+  ],
+  "info": {
+    "language": "fr",
+    "duration": 42.553,
+    "processing_time": 40.583229541778564,
+    "speed_ratio": 1.0485365625274756,
+    "total_segments": 13,
+    "processing_speed_mb_per_min": 2.404582320071363
+  },
+  "metadata": {
+    "filename": "7730.mp3",
+    "model": "medium",
+    "device": "cpu",
+    "processing_mode": "sync",
+    "file_size_mb": 1.6264286041259766,
+    "user_id": "55c41b7f",
+    "queue_position": 1
+  }
+}

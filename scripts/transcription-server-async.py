@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import threading
 from queue import Queue
-
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,17 +33,17 @@ JOBS_DIR = Path("./jobs")
 MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
 LARGE_FILE_THRESHOLD = 50 * 1024 * 1024  # 50MB
 
-# NOUVEAU: Gestion de la concurrence
+
 MAX_CONCURRENT_TRANSCRIPTIONS = 1  # Une seule transcription à la fois
 transcription_queue = Queue()
 active_transcriptions = 0
 transcription_lock = threading.Lock()
 
-print(f"🚀 ReTexte - Mode Réseau Local")
-print(f"   📱 Modèle: {MODEL_SIZE}")
-print(f"   🖥️  Device: {DEVICE}")
-print(f"   👥 Utilisateurs simultanés: ♾️  (interface)")
-print(f"   🎵 Transcriptions simultanées: {MAX_CONCURRENT_TRANSCRIPTIONS}")
+print(f"ReTexte - Mode Réseau Local")
+print(f" Modèle: {MODEL_SIZE}")
+print(f" Device: {DEVICE}")
+print(f" Utilisateurs simultanés:  (interface)")
+print(f" Transcriptions simultanées: {MAX_CONCURRENT_TRANSCRIPTIONS}")
 
 app = FastAPI(
     title="ReTexte", 
@@ -83,7 +82,7 @@ def load_model():
     if whisper_model is None:
         with transcription_lock:
             if whisper_model is None:  # Double-check
-                print(f"🤖 Chargement du modèle {MODEL_SIZE}...")
+                print(f"Chargement du modèle {MODEL_SIZE}...")
                 start_time = time.time()
                 
                 whisper_model = WhisperModel(
@@ -94,7 +93,7 @@ def load_model():
                     num_workers=1
                 )
                 load_time = time.time() - start_time
-                print(f"✅ Modèle {MODEL_SIZE} chargé en {load_time:.1f}s!")
+                print(f"OK !!!! Modèle {MODEL_SIZE} chargé en {load_time:.1f}s!")
 
 def get_cache_path(file_hash: str) -> Path:
     return CACHE_DIR / f"{file_hash}.json"
@@ -104,7 +103,7 @@ def save_cache(file_hash: str, result: Dict[str, Any]):
         with open(get_cache_path(file_hash), 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"⚠️ Erreur sauvegarde cache: {e}")
+        print(f"!!! Erreur sauvegarde cache: {e} !!!")
 
 def load_cache(file_hash: str) -> Optional[Dict[str, Any]]:
     cache_path = get_cache_path(file_hash)
@@ -114,7 +113,7 @@ def load_cache(file_hash: str) -> Optional[Dict[str, Any]]:
                 stats["cache_hits"] += 1
                 return json.load(f)
         except Exception as e:
-            print(f"⚠️ Erreur lecture cache: {e}")
+            print(f"!!! Erreur lecture cache: {e} !!!")
     return None
 
 def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: str = "unknown", job_id: Optional[str] = None) -> Dict[str, Any]:
@@ -128,7 +127,7 @@ def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: 
             queue_position = active_transcriptions
 
         if queue_position > 1:
-            print(f"⏳ Utilisateur {user_id}: En attente (position {queue_position} dans la file)")
+            print(f" Utilisateur {user_id}: En attente (position {queue_position} dans la file)")
 
         # Attendre que ce soit notre tour
         while True:
@@ -137,7 +136,7 @@ def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: 
                     break
             time.sleep(1)  # Attendre 1 seconde
 
-        print(f"🎵 Utilisateur {user_id}: Début transcription de {filename}")
+        print(f"Utilisateur {user_id}: Début transcription de {filename}")
 
         # Chargement du modèle
         load_model()
@@ -147,7 +146,7 @@ def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: 
             raise Exception(f"Fichier non trouvé: {file_path}")
 
         file_size = os.path.getsize(file_path)
-        print(f"📁 Utilisateur {user_id}: Fichier {file_size} bytes")
+        print(f"Utilisateur {user_id}: Fichier {file_size} bytes")
 
         # Transcription
         start_time = time.time()
@@ -212,11 +211,11 @@ def transcribe_file_safe(file_path: str, language: str, filename: str, user_id: 
             }
         }
 
-        print(f"✅ Utilisateur {user_id}: Transcription terminée en {processing_time:.1f}s")
+        print(f"OK !!! Utilisateur {user_id}: Transcription terminée en {processing_time:.1f}s")
         return result
 
     except Exception as e:
-        print(f"❌ Utilisateur {user_id}: Erreur transcription: {str(e)}")
+        print(f"!!! Utilisateur {user_id}: Erreur transcription: {str(e)} !!!")
         raise e
 
     finally:
@@ -235,7 +234,7 @@ async def process_transcription_async(job_id: str, file_content: bytes, filename
         file_hash = hashlib.sha256(file_content).hexdigest()
         cached_result = load_cache(file_hash)
         if cached_result:
-            print(f"📋 Utilisateur {user_id}: Cache hit pour {filename}")
+            print(f"Utilisateur {user_id}: Cache hit pour {filename}")
             jobs_status[job_id] = {"status": "completed", "result": cached_result, "progress": 100}
             return
 
@@ -266,7 +265,7 @@ async def process_transcription_async(job_id: str, file_content: bytes, filename
                 pass
                 
     except Exception as e:
-        print(f"❌ Utilisateur {user_id}: Erreur async: {e}")
+        print(f"!!! Utilisateur {user_id}: Erreur async: {e} !!!")
         jobs_status[job_id] = {"status": "error", "error": str(e)}
 
 @app.get("/")
@@ -317,19 +316,19 @@ async def transcribe_unified(
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail=f"Fichier trop volumineux")
     
-    print(f"📁 Utilisateur {user_id}: Fichier reçu {file.filename} ({file_size_mb:.1f}MB)")
+    print(f"Utilisateur {user_id}: Fichier reçu {file.filename} ({file_size_mb:.1f}MB)")
     
     # Vérifier le cache
     file_hash = hashlib.sha256(file_content).hexdigest()
     cached_result = load_cache(file_hash)
     if cached_result:
-        print(f"📋 Utilisateur {user_id}: Résultat en cache")
+        print(f"Utilisateur {user_id}: Résultat en cache")
         return JSONResponse(content=cached_result)
     
     # Informer sur la file d'attente
     current_queue = active_transcriptions
     if current_queue > 0:
-        print(f"⏳ Utilisateur {user_id}: {current_queue} transcription(s) en cours")
+        print(f"Utilisateur {user_id}: {current_queue} transcription(s) en cours")
     
     # Décision du mode
     is_large_file = file_size > LARGE_FILE_THRESHOLD
@@ -343,7 +342,7 @@ async def transcribe_unified(
         if current_queue > 0:
             estimated_minutes += current_queue * 2  # +2min par job en attente
         
-        print(f"🐘 Utilisateur {user_id}: Job asynchrone {job_id}")
+        print(f"Utilisateur {user_id}: Job asynchrone {job_id}")
         
         background_tasks.add_task(process_transcription_async, job_id, file_content, file.filename, language, user_id)
         
@@ -358,7 +357,7 @@ async def transcribe_unified(
     
     else:
         # Mode synchrone avec file d'attente
-        print(f"🐁 Utilisateur {user_id}: Traitement synchrone")
+        print(f"Utilisateur {user_id}: Traitement synchrone")
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
             tmp_file.write(file_content)
@@ -376,7 +375,7 @@ async def transcribe_unified(
         
         except Exception as e:
             error_msg = f"Erreur transcription: {str(e)}"
-            print(f"❌ Utilisateur {user_id}: {error_msg}")
+            print(f"!!! Utilisateur {user_id}: {error_msg} !!!")
             raise HTTPException(status_code=500, detail=error_msg)
     
         finally:
@@ -384,7 +383,7 @@ async def transcribe_unified(
                 if os.path.exists(tmp_file_path):
                     os.unlink(tmp_file_path)
             except Exception as cleanup_error:
-                print(f"⚠️ Erreur nettoyage: {cleanup_error}")
+                print(f"!!! Erreur nettoyage: {cleanup_error} !!!")
 
 @app.get("/transcribe/status/{job_id}")
 async def get_job_status(job_id: str):
@@ -419,8 +418,8 @@ async def get_queue_status():
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
-    print("🚀 Démarrage ReTexte - Réseau Local...")
-    print("   👥 Support multi-utilisateurs avec file d'attente")
-    print("   🎵 Une transcription à la fois (évite les conflits)")
+    print("Démarrage ReTexte - Réseau Local...")
+    print("  Support multi-utilisateurs avec file d'attente")
+    print("  Une transcription à la fois (évite les conflits)")
     print()
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
